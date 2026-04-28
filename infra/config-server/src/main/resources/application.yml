@@ -9,10 +9,10 @@ spring:
     config:
       server:
         native:
-          searchLocations:
-            - classpath:config/core/{application}
-            - classpath:config/stats-service/{application}
-            - classpath:config/infra/{application}
+          search-locations:
+            - classpath:/config/core/{application}
+            - classpath:/config/stats-service/{application}
+            - classpath:/config/infra/{application}
 eureka:
   instance:
     prefer-ip-address: true
