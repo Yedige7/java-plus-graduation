@@ -1,14 +1,22 @@
 services:
-  stats-server:
-    ports:
-      - "9090:9090"
-
   stats-db:
     image: postgres:16.1
-
-  ewm-service:
+    container_name: postgres-ewm-stats-db
     ports:
-      - "8080:8080"
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: stats
+      POSTGRES_USER: stats
+      POSTGRES_PASSWORD: stats
 
   ewm-db:
     image: postgres:16.1
+    container_name: postgres-ewm-main-db
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: ewm-main
+      POSTGRES_USER: main
+      POSTGRES_PASSWORD: main
+    volumes:
+      - ./core/main-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql

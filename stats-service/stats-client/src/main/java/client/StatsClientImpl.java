@@ -6,10 +6,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.ewm.stats.dto.EndpointHitDto;
 import ru.practicum.ewm.stats.dto.ViewStatsDto;
@@ -28,25 +26,13 @@ public class StatsClientImpl implements StatsClient {
     private final String baseUrl;
 
     public StatsClientImpl(
-        @Value("${stats.service.url:http://localhost:9090}") String baseUrl
+            RestTemplate restTemplate,
+            @Value("${stats.service.url:http://stats-server}") String baseUrl
     ) {
-        this.restTemplate = this.getRestTemplate(baseUrl);
+        this.restTemplate = restTemplate;
         this.baseUrl = baseUrl;
     }
 
-    private RestTemplate getRestTemplate(String url) {
-        RestTemplate restTemplate = new RestTemplate();
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(5000);
-        restTemplate.setRequestFactory(requestFactory);
-        restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(url));
-        return restTemplate;
-    }
-
-    /**
-     * POST /hit
-     */
     @Override
     public void hit(EndpointHitDto endpointHit) {
         String url = UriComponentsBuilder
@@ -54,13 +40,9 @@ public class StatsClientImpl implements StatsClient {
                 .path("/hit")
                 .toUriString();
 
-        HttpEntity<EndpointHitDto> request = new HttpEntity<>(endpointHit);
-        restTemplate.postForEntity(url, request, Void.class);
+        restTemplate.postForEntity(url, new HttpEntity<>(endpointHit), Void.class);
     }
 
-    /**
-     * GET /stats
-     */
     @Override
     public List<ViewStatsDto> getStats(
             LocalDateTime start,
@@ -72,8 +54,8 @@ public class StatsClientImpl implements StatsClient {
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(baseUrl)
                 .path("/stats")
-                .queryParam("start", start.format(formatter).replace(" ", "%20"))
-                .queryParam("end", end.format(formatter).replace(" ", "%20"));
+                .queryParam("start", start.format(formatter))
+                .queryParam("end", end.format(formatter));
 
         if (uris != null && !uris.isEmpty()) {
             uris.forEach(uri -> builder.queryParam("uris", uri));
@@ -83,7 +65,7 @@ public class StatsClientImpl implements StatsClient {
             builder.queryParam("unique", unique);
         }
 
-        URI uri = builder.build(true).toUri();
+        URI uri = builder.build().encode().toUri();
         log.info("getStats URI: {}", uri);
 
         ResponseEntity<List<ViewStatsDto>> response = restTemplate.exchange(
