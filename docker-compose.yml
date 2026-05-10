@@ -15,8 +15,8 @@ services:
     ports:
       - "5434:5432"
     environment:
-      POSTGRES_DB: ewm-main
+      POSTGRES_DB: user_db
       POSTGRES_USER: main
       POSTGRES_PASSWORD: main
     volumes:
-      - ./core/main-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./docker/init-ewm-dbs.sql:/docker-entrypoint-initdb.d/01-init-ewm-dbs.sql
