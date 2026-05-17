@@ -1,36 +1,18 @@
 package event.repository;
 
 import event.model.Event;
-import event.model.EventState;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface EventRepository {
+public interface EventRepository extends JpaRepository<Event, Long> {
     Event save(Event event);
 
     List<Event> findByInitiatorId(Long initiatorId, Pageable page);
 
-    List<Event> findForAdmin(List<Long> users,
-                             List<EventState> states,
-                             List<Integer> categories,
-                             LocalDateTime rangeStart,
-                             LocalDateTime rangeEnd,
-                             Pageable page);
-
-    List<Event> findPublicEvents(String text,
-                                 List<Integer> categories,
-                                 Boolean paid,
-                                 LocalDateTime rangeStart,
-                                 LocalDateTime rangeEnd,
-                                 Boolean onlyAvailable,
-                                 Pageable page);
-
     Optional<Event> findById(Long eventId);
-
-    Optional<Event> findByIdAndState(Long eventId, EventState eventState);
 
     boolean existsByCategoryId(Long categoryId);
 }

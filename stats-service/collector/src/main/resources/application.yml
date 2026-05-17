@@ -1,0 +1,35 @@
+server:
+  port: 0
+
+grpc:
+  server:
+    port: 0
+
+spring:
+  application:
+    name: collector
+
+  cloud:
+    config:
+      enabled: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.LongSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
+collector:
+  kafka:
+    topic:
+      user-actions: stats.user-actions.v1
+eureka:
+  instance:
+    prefer-ip-address: true
+    ip-address: 127.0.0.1
+    hostname: localhost
+    instance-id: "${spring.application.name}:${random.value}"
+
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/

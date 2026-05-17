@@ -1,13 +1,13 @@
 package event.service;
 
 
-import common.dto.EndpointHitDto;
+import client.RecommendationClient;
+import client.StatsClient;
 import common.exception.BadRequestException;
 import common.exception.ConflictException;
 import common.exception.NotFoundException;
 import event.client.CategoryClient;
 import event.client.RequestClient;
-import event.client.StatsClient;
 import event.client.UserClient;
 import event.dto.*;
 import event.mapper.EventMapper;
@@ -24,14 +24,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.ewm.stats.dto.ViewStatsDto;
+import ru.practicum.ewm.stats.proto.RecommendedEventProto;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,8 +39,9 @@ public class EventServiceImpl implements EventService {
     private final CategoryClient categoryClient;
     private final EventRepository eventRepository;
     private final DatabaseEventSearchRepository databaseEventSearchRepository;
-    private final StatsClient statsClient;
     private final RequestClient requestClient;
+    private final StatsClient statsClient;
+    private final RecommendationClient recommendationClient;
 
     @Override
     @Transactional
@@ -98,7 +98,7 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
-    public EventFullDto getPublicEvent(Long eventId, HttpServletRequest request) {
+    public EventFullDto getPublicEvent(Long eventId, Long userId, HttpServletRequest request) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
@@ -107,7 +107,7 @@ public class EventServiceImpl implements EventService {
         }
 
         List<Event> eventList = List.of(event);
-        registerHit(request);
+        registerView(eventId, userId);
 
         return this.mapToEventFullDto(eventList).getFirst();
     }
@@ -151,7 +151,7 @@ public class EventServiceImpl implements EventService {
             page = PageRequest.of(from / size, size);
         }
 
-        registerHit(request);
+//        registerHit(request);
 
         List<Event> eventList = databaseEventSearchRepository.findPublicEvents(
                 text, categories, paid, rangeStart, rangeEnd, onlyAvailable, page
@@ -244,54 +244,28 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    private void registerHit(HttpServletRequest request) {
-        EndpointHitDto endpointHitDto = new EndpointHitDto();
-        endpointHitDto.setApp("main-service");
-        endpointHitDto.setUri(request.getRequestURI());
-        endpointHitDto.setIp(request.getRemoteAddr());
-        endpointHitDto.setTimestamp(LocalDateTime.now());
-        statsClient.hit(endpointHitDto);
+    private void registerView(Long eventId, Long userId) {
+        try {
+            statsClient.sendView(userId, eventId);
+        } catch (Exception ignored) {
+        }
     }
 
     private Map<Long, Integer> getEventsViews(List<Event> eventList) {
-        if (eventList == null || eventList.isEmpty()) return Map.of();
-
-        List<String> uris = eventList.stream()
-                .map(e -> "/events/" + e.getId())
-                .toList();
-
-        LocalDateTime start = eventList.stream()
-                .map(Event::getCreatedOn)
-                .filter(java.util.Objects::nonNull)
-                .min(Comparator.naturalOrder())
-                .orElse(LocalDateTime.now().minusYears(1));
-
-        LocalDateTime end = LocalDateTime.now();
-
-        DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-        try {
-            List<ViewStatsDto> stats = statsClient.getStats(
-                    start.format(formatter),
-                    end.format(formatter),
-                    uris,
-                    true
-            );
-
-            Map<Long, Integer> map = new HashMap<>();
-            for (ViewStatsDto s : stats) {
-                String[] parts = s.getUri().split("/");
-                if (parts.length >= 3) {
-                    long eventId = Long.parseLong(parts[2]);
-                    map.put(eventId, (int) s.getHits());
-                }
-            }
-            return map;
-        } catch (Exception ex) {
-            // критично: не роняем эндпоинт
+        if (eventList == null || eventList.isEmpty()) {
             return Map.of();
         }
+
+        List<Long> eventIds = eventList.stream()
+                .map(Event::getId)
+                .toList();
+
+        return recommendationClient.getInteractionsCount(eventIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        RecommendedEventProto::getEventId,
+                        r -> (int) Math.round(r.getScore())
+                ));
     }
 
     private List<EventFullDto> mapToEventFullDto(List<Event> eventList) {
@@ -334,5 +308,35 @@ public class EventServiceImpl implements EventService {
                         confirmed.getOrDefault(e.getId(), 0L)
                 ))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EventShortDto> getRecommendations(Long userId, Integer maxResults) {
+        List<Long> eventIds = recommendationClient.getRecommendationsForUser(userId, maxResults)
+                .stream()
+                .map(RecommendedEventProto::getEventId)
+                .toList();
+
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Event> events = eventRepository.findAllById(eventIds);
+
+        return mapToEventShortDto(events);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void likeEvent(Long eventId, Long userId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event not found"));
+
+        if (event.getState() != EventState.PUBLISHED) {
+            throw new NotFoundException("Event is not published");
+        }
+
+        statsClient.sendLike(userId, eventId);
     }
 }

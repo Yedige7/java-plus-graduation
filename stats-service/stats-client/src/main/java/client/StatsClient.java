@@ -1,19 +1,57 @@
 package client;
 
-import ru.practicum.ewm.stats.dto.EndpointHitDto;
-import ru.practicum.ewm.stats.dto.ViewStatsDto;
+import com.google.protobuf.Timestamp;
+import io.grpc.StatusRuntimeException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.devh.boot.grpc.client.inject.GrpcClient;
+import org.springframework.stereotype.Component;
+import ru.practicum.ewm.stats.proto.ActionTypeProto;
+import ru.practicum.ewm.stats.proto.UserActionControllerGrpc;
+import ru.practicum.ewm.stats.proto.UserActionProto;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.time.Instant;
 
-public interface StatsClient {
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class StatsClient {
 
-    void hit(EndpointHitDto endpointHit);
+    @GrpcClient("collector")
+    private UserActionControllerGrpc.UserActionControllerBlockingStub blockingStub;
 
-    List<ViewStatsDto> getStats(
-            LocalDateTime start,
-            LocalDateTime end,
-            List<String> uris,
-            Boolean unique
-    );
+    public void sendView(Long userId, Long eventId) {
+        send(userId, eventId, ActionTypeProto.ACTION_VIEW);
+    }
+
+    public void sendRegistration(Long userId, Long eventId) {
+        send(userId, eventId, ActionTypeProto.ACTION_REGISTER);
+    }
+
+    public void sendLike(Long userId, Long eventId) {
+        send(userId, eventId, ActionTypeProto.ACTION_LIKE);
+    }
+
+    private void send(Long userId, Long eventId, ActionTypeProto actionType) {
+
+        Instant now = Instant.now();
+
+        UserActionProto request = UserActionProto.newBuilder()
+                .setUserId(userId)
+                .setEventId(eventId)
+                .setActionType(actionType)
+                .setTimestamp(
+                        Timestamp.newBuilder()
+                                .setSeconds(now.getEpochSecond())
+                                .setNanos(now.getNano())
+                                .build()
+                )
+                .build();
+
+        try {
+            blockingStub.collectUserAction(request);
+        } catch (StatusRuntimeException e) {
+            log.error("Failed to send user action", e);
+        }
+    }
 }

@@ -1,9 +1,6 @@
 server:
   port: 0
 
-stats:
-  service:
-    url: http://stats-server
 
 spring:
   datasource:

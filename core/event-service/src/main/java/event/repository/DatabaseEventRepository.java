@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface DatabaseEventRepository extends EventRepository, JpaRepository<Event, Long> {
-    @Override
     @Query("""
             SELECT e
             FROM Event e
@@ -27,7 +26,6 @@ public interface DatabaseEventRepository extends EventRepository, JpaRepository<
                              LocalDateTime rangeEnd,
                              Pageable page);
 
-    @Override
     @Query("""
             SELECT e
             FROM Event e

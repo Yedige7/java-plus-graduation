@@ -9,7 +9,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @SpringBootApplication(scanBasePackages = {
         "event",
-        "compilation"
+        "compilation",
+        "client"
+
 })
 @EnableDiscoveryClient
 @EnableFeignClients

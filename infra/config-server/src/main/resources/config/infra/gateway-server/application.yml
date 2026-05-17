@@ -19,7 +19,7 @@ spring:
         - id: request-service
           uri: lb://request-service
           predicates:
-            - Path=/users/{userId}/requests,/users/{userId}/requests/{requestId}/cancel,/users/{userId}/events/{eventId}/requests
+            - Path=/users/*/requests,/users/*/requests/*/cancel,/users/*/events/*/requests
 
         - id: user-service
           uri: lb://user-service

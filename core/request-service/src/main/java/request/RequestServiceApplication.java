@@ -5,9 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {
+        "request",
+        "client"
+})
 @EnableDiscoveryClient
-@EnableFeignClients
+@EnableFeignClients(basePackages = "request.client")
 public class RequestServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(RequestServiceApplication.class, args);
