@@ -18,9 +18,11 @@ import java.util.Map;
 public class SimilarityService {
 
     private final KafkaTemplate<Long, byte[]> kafkaTemplate;
+
     private final Map<Long, Map<Long, Double>> eventUserWeights = new HashMap<>();
     private final Map<Long, Double> eventWeightsSum = new HashMap<>();
     private final Map<Long, Map<Long, Double>> minWeightsSums = new HashMap<>();
+
     @Value("${aggregator.kafka.topic.events-similarity}")
     private String eventsSimilarityTopic;
 
@@ -60,16 +62,18 @@ public class SimilarityService {
             double newMin = Math.min(newWeight, otherWeight);
             double minDelta = newMin - oldMin;
 
-            if (minDelta <= 0) {
-                continue;
-            }
+            double sMin;
 
-            double sMin = addMinSum(eventId, otherEventId, minDelta);
+            if (minDelta > 0) {
+                sMin = addMinSum(eventId, otherEventId, minDelta);
+            } else {
+                sMin = getMinSum(eventId, otherEventId);
+            }
 
             double sumA = eventWeightsSum.getOrDefault(eventId, 0.0);
             double sumB = eventWeightsSum.getOrDefault(otherEventId, 0.0);
 
-            if (sumA == 0.0 || sumB == 0.0) {
+            if (sumA == 0.0 || sumB == 0.0 || sMin == 0.0) {
                 continue;
             }
 
@@ -100,6 +104,15 @@ public class SimilarityService {
         return newValue;
     }
 
+    private double getMinSum(long eventA, long eventB) {
+        long first = Math.min(eventA, eventB);
+        long second = Math.max(eventA, eventB);
+
+        return minWeightsSums
+                .getOrDefault(first, Map.of())
+                .getOrDefault(second, 0.0);
+    }
+
     private void sendSimilarity(long eventA, long eventB, double score, Instant timestamp) {
         long first = Math.min(eventA, eventB);
         long second = Math.max(eventA, eventB);
@@ -112,9 +125,12 @@ public class SimilarityService {
                 .build();
 
         byte[] payload = AvroBinarySerializer.toBytes(avro);
+
         System.out.printf(
                 "Similarity eventA=%d eventB=%d score=%f%n",
-                first, second, score
+                first,
+                second,
+                score
         );
 
         kafkaTemplate.send(eventsSimilarityTopic, first, payload);
