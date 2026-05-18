@@ -13,3 +13,9 @@ spring:
       retry:
         use-random-policy: true
         max-interval: 6000
+
+grpc:
+  client:
+    collector:
+      address: discovery:///COLLECTOR
+      negotiationType: plaintext

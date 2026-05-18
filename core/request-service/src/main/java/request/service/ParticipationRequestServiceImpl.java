@@ -1,5 +1,6 @@
 package request.service;
 
+import client.StatsClient;
 import common.dto.EventInternalDto;
 import common.exception.ConflictException;
 import common.exception.NotFoundException;
@@ -29,6 +30,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     private final ParticipationRequestRepository requestRepo;
     private final UserClient userClient;
     private final EventClient eventClient;
+    private final StatsClient statsClient;
 
     @Override
     public ParticipationRequestDto create(Long userId, Long eventId) {
@@ -81,7 +83,14 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
             }
         }
 
-        return ParticipationRequestMapper.toDto(requestRepo.save(req));
+        ParticipationRequest saved = requestRepo.save(req);
+
+        try {
+            statsClient.sendRegistration(userId, eventId);
+        } catch (Exception ignored) {
+        }
+
+        return ParticipationRequestMapper.toDto(saved);
     }
 
     @Override
